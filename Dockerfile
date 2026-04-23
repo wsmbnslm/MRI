@@ -19,7 +19,7 @@ RUN mamba install --yes \
 RUN pip install --no-cache-dir \
     'jupyterlab-code-formatter' \
     'jupyter-archive' \
-    'pypulseq' \
+    'pypulseq==1.4.2.post2' \
     'mrzerocore'
 
 FROM base_stage AS cpu_stage
