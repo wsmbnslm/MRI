@@ -1,9 +1,8 @@
 ARG BASE_CONTAINER
-ARG BUILD
 
 FROM $BASE_CONTAINER as base_stage
 
-ENV CONDA_OVERRIDE_CUDA=${CUDA_VERSION}
+# ENV CONDA_OVERRIDE_CUDA=${CUDA_VERSION}
 
 RUN mamba install --yes \
     --channel conda-forge \
@@ -22,17 +21,12 @@ RUN pip install --no-cache-dir \
     'pypulseq==1.4.2.post2' \
     'mrzerocore'
 
-FROM base_stage AS cpu_stage
+# pytorch is already installed as a dependency of mrzerocore
 
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
-    'torch'
+# RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+#     'torch'
 
-FROM base_stage AS cuda_stage
+# RUN CUDA_VERSION_NO_DOTS=$(echo "$CUDA_VERSION" | tr -d '.') && \
+#     pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION_NO_DOTS} \
+#     'torch'
 
-ARG CUDA_VERSION
-
-RUN CUDA_VERSION_NO_DOTS=$(echo "$CUDA_VERSION" | tr -d '.') && \
-    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION_NO_DOTS} \
-    'torch'
-
-FROM ${BUILD}_stage AS final_stage
