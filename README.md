@@ -71,9 +71,13 @@ Log into registry
 podman login registry.git.fh-aachen.de
 ```
 
-### Build CPU Version
+Pull latest base image
 
-Build locally
+```
+podman pull quay.io/jupyter/datascience-notebook:latest
+```
+
+Build locally 
 
 ```
 podman build \
@@ -81,31 +85,13 @@ podman build \
     --build-arg BASE_CONTAINER=quay.io/jupyter/datascience-notebook:latest \
     --build-arg BUILD=cpu \
     --file Dockerfile
+
 ```
 
 Push to remote
 
 ```
 podman push registry.git.fh-aachen.de/lmp/mri/mri-lab
-```
-
-### Build CUDA Version
-
-Build locally
-
-```
-podman build \
-    --tag registry.git.fh-aachen.de/lmp/mri/mri-lab-cuda \
-    --build-arg BASE_CONTAINER=quay.io/jupyter/datascience-notebook:latest \
-    --build-arg BUILD=cuda \
-    --build-arg CUDA_VERSION=13.0 \
-    --file Dockerfile
-```
-
-Push to remote
-
-```
-podman push registry.git.fh-aachen.de/lmp/mri/mri-lab-cuda
 ```
 
 ## Setup Using Docker Image (Linux)
