@@ -17,4 +17,5 @@ RUN pip install --no-cache-dir \
     'jupyterlab-code-formatter' \
     'jupyter-archive' \
     'pypulseq' \
+    'pytorch_finufft' \
     'mrzerocore'
