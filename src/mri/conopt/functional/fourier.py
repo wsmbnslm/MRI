@@ -140,7 +140,7 @@ def nonuniform_fourier_transform_forward(
     k: torch.Tensor,
     x: torch.Tensor,
     modeord: int = 0,
-    isign: int = 1,
+    isign: int = -1,
     device: Optional[torch.DeviceObjType] = None,
     **finufftkwargs,
 ) -> torch.Tensor:
