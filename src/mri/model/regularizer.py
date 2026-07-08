@@ -1,3 +1,6 @@
+import math
+from typing import Tuple
+
 import torch
 from torch import nn
 
@@ -8,11 +11,11 @@ from .unet import UNet
 class Regularizer(nn.Module):
     def __init__(
         self,
-        shape: tuple[int],
+        shape: Tuple[int, ...],
         regularizer: str = "ResNet",
-        features: list = 32,
+        features: int = 32,
         activation: str = "ReLU",
-        kernel_size: tuple[int] = (3, 3),
+        kernel_size: Tuple[int, ...] = (3, 3),
         scale_factor: int = 0,
         num_of_resblocks: int = 10,
         Checkpoints: bool = False,
@@ -24,46 +27,52 @@ class Regularizer(nn.Module):
 
         Parameters
         ----------
-        shape : torch.Tensor, shape (nX, nY, nZ, nTI, nTE)
-            Shape of the image data.
+        shape : tuple of int, (nX, nY, nZ, *contrast_dims)
+            Shape of the image data. The first three entries are always the spatial
+            dimensions — set nZ = 1 for a 2D dataset. Any number of additional
+            trailing dimensions (e.g. just nT, or nTI and nTE, or none at all) are
+            treated as "contrast" axes and flattened into the network's channel
+            dimension. Examples:
+              - (nX, nY, 1)                -> single image, no contrast axis
+              - (nX, nY, nZ)               -> 3D volume, no contrast axis
+              - (nX, nY, 1, nTI, nTE)      -> 2D, two contrast axes (old behaviour)
+              - (nX, nY, 1, nT)            -> 2D, one contrast axis
         features : int, optional
-            Number of the features of the neural network (default is 128).
-        regularizer: str, optional
-            decides which regularizer should be used. For now there are ResNet and UNet
-            (default is ResNet).
-        activation: str, optional
-            defines the kind of activation function (default is "ReLu")
-        kernel_size: Tuple[int], optional
-            changes the size of the kernel used in the convolutional layers and  its length
-            decides whether all operations should be 2D or 3D. (default is (3,3))
-        num_of_res_blocks : int, optional
-            Number of ResNetBlocks that should be added to the second layer of the
-            ResNet (default is 10).
-        Checkpoints: bool, optional
-            If true then checkpoints will be added in the regularizer, providing lower memory
-            usage to the cost of higher computing time (default is False).
+            Number of features of the neural network (default is 32).
+        regularizer : str, optional
+            Which regularizer to use: "ResNet" or "UNet" (default is "ResNet").
+        activation : str, optional
+            Activation function name (default is "ReLU").
+        kernel_size : tuple of int, optional
+            Convolution kernel size; its length decides whether operations are 2D
+            or 3D (default is (3, 3)).
+        num_of_resblocks : int, optional
+            Number of ResNet blocks (default is 10).
+        Checkpoints : bool, optional
+            If True, use gradient checkpointing to trade compute for memory
+            (default is False).
         device : str, optional
-            Device on which to perform the computation
-            (default is None, which uses the current device).
-            It is also possible to give a list of strings. The first
-            item is the DataConsistency device and the second one is
-            the device used for the regularizer.
+            Device for computation (default is None, current device).
 
         NOTE: This function is under development and may not be fully functional yet.
         """
-
-        _, _, _, nTI, nTE = shape
-        contrasts = nTI * nTE
         super().__init__()
 
-        self.shape = shape
+        if len(shape) < 3:
+            raise ValueError(f"shape must be at least (nX, nY, nZ), got {shape}")
+
+        self.shape = tuple(shape)
+        self.spatial_shape = tuple(shape[:3])   # (nX, nY, nZ)
+        self.contrast_shape = tuple(shape[3:])  # (), (nT,), (nTI, nTE), ...
+        self.contrasts = math.prod(self.contrast_shape) if self.contrast_shape else 1
+
         self.kernel_size = kernel_size
         self.internal_dtype = torch.complex64
         self.dtype = torch.float32
 
         if regularizer == "ResNet":
             self.regularizer = ResNet(
-                contrasts=contrasts,
+                contrasts=self.contrasts,
                 features=features,
                 num_of_resblocks=num_of_resblocks,
                 activation=activation,
@@ -73,53 +82,43 @@ class Regularizer(nn.Module):
                 device=device,
                 dtype=dtype,
             )
-
         elif regularizer == "UNet":
             self.regularizer = UNet(
-                contrasts=contrasts,
+                contrasts=self.contrasts,
                 features=features,
                 kernel_size=kernel_size,
                 activation=activation,
                 device=device,
                 dtype=dtype,
             )
+        else:
+            raise ValueError(f"unknown regularizer type: {regularizer!r}")
 
-    def forward(
-        self,
-        x: torch.Tensor,
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        nX, nY, nZ = self.spatial_shape
 
-        image = x.view(self.internal_dtype).reshape(self.shape)
-    
-        # image = image.clone().detach()
-        image = image.contiguous()
+        image = torch.view_as_complex(x.reshape(-1, 2)).reshape(self.shape)
 
-        nTI, nTE = image.shape[-2:]
-
-        image = image.flatten(start_dim=3, end_dim=4)  # [nX,nY,nZ,nTI*nTE]
-        image = image.permute((3, 0, 1, 2))  # [nTI*nTE,nX,nY,nZ]
-        image = image[None, :, :, :, :]  # [blank,nTI*nTE,nX,nY,nZ]
+        # flatten all trailing contrast dims into one channel axis: [nX,nY,nZ,C]
+        image = image.reshape(nX, nY, nZ, self.contrasts)
+        image = image.permute(3, 0, 1, 2)   # [C, nX, nY, nZ]
+        image = image[None]                  # [1, C, nX, nY, nZ]
 
         if len(self.kernel_size) == 2:
-            if image.shape[-1] == 1:
-                image = image[:, :, :, :, 0]  # [blank,nTI*nTE,nX,nY]
-
-            else:
+            if nZ != 1:
                 raise ValueError(
                     "z-dimension will be killed when using a 2D kernel on a 3D dataset"
                 )
+            image = image[..., 0]            # [1, C, nX, nY]
 
         image = self.regularizer(image)
-        
+
         if len(self.kernel_size) == 2:
-            image = image[:, :, :, :, None]  # [blank,nTI*nTE,nX,nY,nZ]
+            image = image[..., None]         # [1, C, nX, nY, nZ]
 
-        image = image[0, :, :, :, :]
-        image = image.unflatten(
-            0, (nTI, nTE)
-        )  # switches shape to [blank,nTI,nTE,nX,nY,nZ]
-        image = image.permute((2, 3, 4, 0, 1))  # switches shape to [nX,nY,nZ,nTI,nTE]
-
+        image = image[0]                     # [C, nX, nY, nZ]
+        image = image.permute(1, 2, 3, 0)    # [nX, nY, nZ, C]
+        image = image.reshape(*self.spatial_shape, *self.contrast_shape)
         image = image.contiguous()
-        
-        return image.ravel().view(self.dtype)
+
+        return torch.view_as_real(image.reshape(-1)).reshape(-1)
