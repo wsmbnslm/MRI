@@ -2,6 +2,17 @@ ARG BASE_CONTAINER
 
 FROM $BASE_CONTAINER as base_stage
 
+USER $ROOT
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        lmodern \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER $NB_UID
+
 RUN mamba install --yes \
     --channel conda-forge \
     'black' \
