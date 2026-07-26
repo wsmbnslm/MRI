@@ -1,20 +1,24 @@
+"""FFT and NUFFT operators for MRI reconstruction.
+
+Uniform (Cartesian) FFT via torch.fft, plus non-uniform FFT (NUFFT)
+between an image grid and arbitrary k-space samples, using a vendored,
+trimmed Kaiser-Bessel gridding NUFFT (see kbnufft_lite.py) -- pure
+PyTorch, GPU-capable, no native library dependency.
+
+k is in cycles/voxel, scaled to [-0.5, 0.5]. kbnufft_lite's sign
+convention is negated relative to the usual forward/adjoint DFT
+convention, so k is negated before being passed to it. Output is
+normalized by 1 / sqrt(#grid points).
+"""
+
 import math
 import warnings
 from collections.abc import Sequence
-from functools import partial
 from typing import Optional
 
 import torch
 
-try:
-    from pytorch_finufft.functional import finufft_type1, finufft_type2
-except ImportError:
-    finufft_type1 = finufft_type2 = None
-
-try:
-    from torchkbnufft import KbNufft, KbNufftAdjoint
-except ImportError:
-    KbNufft = KbNufftAdjoint = None
+from .kbnufft import KbNufft, KbNufftAdjoint
 
 
 def fourier_transform_forward(x: torch.Tensor, axes: tuple[int, ...]) -> torch.Tensor:
@@ -29,17 +33,6 @@ def fourier_transform_adjoint(x: torch.Tensor, axes: tuple[int, ...]) -> torch.T
     x = torch.fft.ifftshift(x, dim=axes)
     x = torch.fft.ifftn(x, dim=axes, norm="ortho")
     return torch.fft.fftshift(x, dim=axes)
-
-
-def _check_backend(backend: str) -> None:
-    if backend not in ("torchkbnufft", "finufft"):
-        raise ValueError(
-            f"backend must be 'torchkbnufft' or 'finufft', got {backend!r}."
-        )
-    if backend == "finufft" and finufft_type2 is None:
-        raise ImportError("pip install pytorch-finufft")
-    if backend == "torchkbnufft" and KbNufft is None:
-        raise ImportError("pip install torchkbnufft")
 
 
 def _match_device(k, x, device):
@@ -65,19 +58,16 @@ def _split_batch_axes(k_extra: Sequence[int], x_extra: Sequence[int]):
 def nonuniform_fourier_transform_forward(
     k: torch.Tensor,
     x: torch.Tensor,
-    backend: str = "torchkbnufft",
     nufft_ob: Optional["KbNufft"] = None,
     device: torch.device | None = None,
-    **backend_kwargs,
+    **kbnufft_kwargs,
 ) -> torch.Tensor:
     """NUFFT forward: image -> non-uniform k-space samples.
 
     k: (D, N, ...) in [-0.5, 0.5]. x: (C, R, P1, P2, ...).
-    Returns (C, N, ...). backend_kwargs go to KbNufft (e.g. numpoints) or,
-    for backend="finufft", to finufft_type2 (e.g. eps, isign, modeord;
-    default isign=1, modeord=0).
+    Returns (C, N, ...). kbnufft_kwargs go to KbNufft (e.g. numpoints),
+    ignored if nufft_ob is given.
     """
-    _check_backend(backend)
     k, x, device = _match_device(k, x, device)
     k = 2 * torch.pi * k.to(torch.float32)
     x = x.to(torch.complex64)
@@ -94,16 +84,10 @@ def nonuniform_fourier_transform_forward(
     k = k.reshape(D, N, n_shared).permute(2, 0, 1)
     x = x.squeeze(dim=(-1, -2, -3))  # drop singleton spatial dims
 
-    if backend == "torchkbnufft":
-        if nufft_ob is None:
-            nufft_ob = KbNufft(im_size=tuple(x.shape[2:]), **backend_kwargs)
-            nufft_ob = nufft_ob.to(device)
-        y = nufft_ob(x, -k)  # negate k: torchkbnufft's sign is flipped
-    else:
-        kwargs = {"modeord": 0, "isign": 1, **backend_kwargs}
-        fn = partial(finufft_type2, **kwargs)
-        y = torch.vmap(fn, in_dims=0)(k.cpu().contiguous(), x.cpu().contiguous())
-        y = y.to(device)
+    if nufft_ob is None:
+        nufft_ob = KbNufft(im_size=tuple(x.shape[2:]), **kbnufft_kwargs)
+        nufft_ob = nufft_ob.to(device)
+    y = nufft_ob(x, -k)  # negate k: kbnufft_lite's sign is flipped
 
     y = (y / norm).reshape(*shared, *excl, N)
     y = y.moveaxis((-2, -1), (0, 1))  # -> (C, N, shared, excl)
@@ -116,19 +100,16 @@ def nonuniform_fourier_transform_adjoint(
     k: torch.Tensor,
     x: torch.Tensor,
     n_modes: tuple[int] | tuple[int, int] | tuple[int, int, int],
-    backend: str = "torchkbnufft",
     adj_ob: Optional["KbNufftAdjoint"] = None,
     device: torch.device | None = None,
-    **backend_kwargs,
+    **kbnufft_kwargs,
 ) -> torch.Tensor:
     """NUFFT adjoint: non-uniform k-space samples -> image.
 
     k: (D, N, ...). x: (N,), (C, N) or (C, N, ...).
-    Returns (C, nx, ny, nz, ...), missing grid dims set to 1. backend_kwargs
-    go to KbNufftAdjoint or, for backend="finufft", to finufft_type1 (e.g.
-    eps, isign, modeord; default isign=-1, modeord=0).
+    Returns (C, nx, ny, nz, ...), missing grid dims set to 1.
+    kbnufft_kwargs go to KbNufftAdjoint, ignored if adj_ob is given.
     """
-    _check_backend(backend)
     if k.shape[0] != len(n_modes):
         raise ValueError(f"n_modes has {len(n_modes)} dims, k has {k.shape[0]}.")
 
@@ -155,16 +136,10 @@ def nonuniform_fourier_transform_adjoint(
     x = x.reshape(N, n_shared, n_excl).permute(1, 2, 0)
     k = k.reshape(D, N, n_shared).permute(2, 0, 1)
 
-    if backend == "torchkbnufft":
-        if adj_ob is None:
-            adj_ob = KbNufftAdjoint(im_size=n_modes, **backend_kwargs)
-            adj_ob = adj_ob.to(device)
-        y = adj_ob(x, -k)  # negate k: torchkbnufft's sign is flipped
-    else:
-        kwargs = {"modeord": 0, "isign": -1, "output_shape": n_modes, **backend_kwargs}
-        fn = partial(finufft_type1, **kwargs)
-        y = torch.vmap(fn, in_dims=0)(k.cpu().contiguous(), x.cpu().contiguous())
-        y = y.to(device)
+    if adj_ob is None:
+        adj_ob = KbNufftAdjoint(im_size=n_modes, **kbnufft_kwargs)
+        adj_ob = adj_ob.to(device)
+    y = adj_ob(x, -k)  # negate k: kbnufft_lite's sign is flipped
 
     y = y / norm
     for _ in range(3 - len(n_modes)):

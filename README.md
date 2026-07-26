@@ -83,9 +83,7 @@ Build locally
 podman build \
     --tag registry.git.fh-aachen.de/lmp/mri/mri-lab \
     --build-arg BASE_CONTAINER=quay.io/jupyter/datascience-notebook:latest \
-    --build-arg BUILD=cpu \
     --file Dockerfile
-
 ```
 
 Push to remote

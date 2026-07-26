@@ -18,6 +18,7 @@ RUN mamba install --yes \
     'black' \
     'ipympl' \
     'isort' \
+    'jupytext' \
     'nibabel' \
     'rclone' \
     && \
@@ -25,9 +26,8 @@ RUN mamba install --yes \
     fix-permissions $CONDA_DIR
 
 RUN pip install --no-cache-dir \
-    'finufft==v2.5.0' \
     'jupyterlab-code-formatter' \
     'jupyter-archive' \
+    'mrzerocore' \
     'pypulseq' \
-    'pytorch_finufft' \
-    'mrzerocore'
+    'torch'
