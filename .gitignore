@@ -2,3 +2,6 @@
 *.pyc
 *.mat
 *.seq
+*.chat
+solutions/md/
+solutions/pdf/
