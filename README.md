@@ -118,6 +118,9 @@ podman run \
   --volume $HOME/.config/rclone:/home/jovyan/.config/rclone:Z \
   --volume $HOME/.jupyter:/home/jovyan/.jupyter:Z \
   --volume $HOME/.ssh:/home/jovyan/.ssh:Z \
+  --volume $HOME/.claude:/home/jovyan/.claude:Z \
+  --volume $HOME/.config/opencode:/home/jovyan/.config/opencode:Z \
+  --volume $HOME/.local/share/opencode:/home/jovyan/.local/share/opencode:Z \
   --volume $HOME/Documents/mri:/home/jovyan/mri:Z \
   --volume $HOME/Documents/mri-data:/home/jovyan/mri-data:Z \
   --publish 8888:8888 \
