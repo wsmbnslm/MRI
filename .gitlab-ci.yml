@@ -16,7 +16,7 @@ before_script:
 build-main:
   stage: build
   tags:
-    - shared
+    - rke2-in-cluster
   only:
     refs:
       - main
