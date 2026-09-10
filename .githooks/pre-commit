@@ -1,0 +1,28 @@
+#!/bin/sh
+# Strip Jupyter notebook outputs from staged .ipynb files before committing,
+# so committed notebooks stay small and diffs stay readable.
+#
+# This hook is enabled via `git config core.hooksPath .githooks` (already set for
+# this repo). It needs `nbstripout` on PATH (`pip install nbstripout`); if it is
+# missing the hook warns and lets the commit through rather than failing.
+
+STAGED_IPYNB=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ipynb$' || true)
+[ -z "$STAGED_IPYNB" ] && exit 0
+
+if ! command -v nbstripout >/dev/null 2>&1; then
+    echo "pre-commit: nbstripout not found, skipping (pip install nbstripout)" >&2
+    exit 0
+fi
+
+echo "pre-commit: stripping notebook outputs from staged .ipynb files"
+if ! nbstripout $STAGED_IPYNB; then
+    rc=$?
+    # nbstripout exits 1 when it modified a file (expected); only fail on real errors (>= 2)
+    if [ $rc -ge 2 ]; then
+        echo "pre-commit: nbstripout failed (exit $rc)" >&2
+        exit 1
+    fi
+fi
+
+git add $STAGED_IPYNB
+exit 0
