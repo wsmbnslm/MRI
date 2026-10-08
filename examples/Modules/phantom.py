@@ -3,7 +3,8 @@ import torch
 import torch.nn.functional as F
 import MRzeroCore as mr0
 
-def load_brain_phantom(raw_path, target_size, device, permute_order=(2, 1, 0)):
+def load_brain_phantom(raw_path, target_size, device, permute_order=(2, 1, 0),
+                       fov: float = 0.25):
     n_z, n_y, n_x = target_size
     raw_data = np.fromfile(raw_path, dtype=np.uint8).reshape(362, 434, 362)
 
@@ -28,6 +29,16 @@ def load_brain_phantom(raw_path, target_size, device, permute_order=(2, 1, 0)):
     t2_map = torch.where((pd_map <= 0.9) & (pd_map > 0.75), 0.08, t2_map)
     t2_map = torch.where((pd_map <= 0.75) & (pd_map > 0.1), 0.07, t2_map)
 
+    # VoxelGridPhantom expects a 4x4 affine (voxel -> world, in mm).
+    # The grid spans an isotropic cube of side `fov` (meters), centered at
+    # the origin: voxel i is at (i - N/2) * dv for even N.
+    shape = torch.tensor(pd_map.shape, dtype=torch.float32)
+    dv = fov * 1000.0 / shape  # mm per voxel
+    affine = torch.eye(4, device=device)
+    for i in range(3):
+        affine[i, i] = dv[i]
+        affine[i, 3] = -dv[i] * (shape[i] // 2)
+
     return mr0.VoxelGridPhantom(
         pd_map,
         t1_map,
@@ -37,5 +48,5 @@ def load_brain_phantom(raw_path, target_size, device, permute_order=(2, 1, 0)):
         torch.zeros_like(pd_map),
         torch.ones_like(pd_map).unsqueeze(0),
         torch.ones_like(pd_map).unsqueeze(0),
-        torch.tensor([0.256, 0.256, 0.256], device=device),
+        affine,
     )

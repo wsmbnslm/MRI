@@ -211,12 +211,13 @@ class _InterpForward(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        omega, n_shift, numpoints, table_oversamp, offsets, grid_size = ctx.saved_tensors[:6]
-        tables = list(ctx.saved_tensors[6:])
-        grad_image = _table_interp_adjoint(
+        saved = ctx.saved_tensors                       # single access
+        omega, n_shift, numpoints, table_oversamp, offsets, grid_size = saved[:6]
+        tables = list(saved[6:])
+        grad_data = _table_interp_adjoint(
             grad_output, omega, tables, n_shift, numpoints, table_oversamp, offsets, grid_size
         )
-        return grad_image, None, None, None, None, None, None
+        return grad_data, None, None, None, None, None, None, None
 
 
 class _InterpAdjoint(Function):
@@ -229,8 +230,9 @@ class _InterpAdjoint(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        omega, n_shift, numpoints, table_oversamp, offsets = ctx.saved_tensors[:5]
-        tables = list(ctx.saved_tensors[5:])
+        saved = ctx.saved_tensors                       # single access
+        omega, n_shift, numpoints, table_oversamp, offsets = saved[:5]
+        tables = list(saved[5:])
         grad_data = _table_interp(
             grad_output, omega, tables, n_shift, numpoints, table_oversamp, offsets
         )
