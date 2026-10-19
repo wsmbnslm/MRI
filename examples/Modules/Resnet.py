@@ -136,32 +136,3 @@ class ResNet(nn.Module):
 
         return image
 
-class DeepADMM(nn.Module):
-
-    def __init__(self, shape, rho_init=0.1, maxiter_admm=10, maxiter_cg=5):
-
-        super().__init__()
-        self.rho = nn.Parameter(torch.tensor(rho_init, dtype=torch.float32))
-        self.regularizer = Regularizer(shape)
-        self.I = IdentityOperator(shape)
-        self.maxiter_admm = maxiter_admm
-        self.maxiter_cg = maxiter_cg
-
-    def forward(self,Q,b,x, disable_progressbar=True):
-        z = torch.zeros(self.I.shape[0], dtype=x.dtype)
-        u = torch.zeros(self.I.shape[0], dtype=x.dtype)
-
-        for iteration in range(self.maxiter_admm):
-    
-            x = conjugate_gradient(
-                Q + self.rho * self.I,
-                b=b + self.rho * (z - u),
-                x=x,
-                maxiter=self.maxiter_cg,
-                disable_progressbar=True,
-            )
-    
-            z = self.regularizer(x + u)
-            u = u + x - z
-    
-        return x

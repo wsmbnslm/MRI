@@ -2,7 +2,7 @@
 
 Why the original is slow
 ------------------------
-The pypulseq importer splits each 96-sample readout into one event per ADC
+The pypulseq importer splits each N_x-sample readout into one event per ADC
 sample, so a typical repetition has ~120 events.  The original simulation
 loops over every event of every repetition (~760k events for 6400 spokes)
 and, per event:
@@ -13,7 +13,7 @@ and, per event:
   T2' dephasing (zero-initialized, then filled with 5 indexed writes), and
   applies it with ``einsum``.
 
-For a 96^3 phantom with 64 spins that is several GB of memory traffic per
+For a N_x^3 phantom with 64 spins that is several GB of memory traffic per
 event, i.e. petabytes total - hence hours of runtime.
 
 This version exploits the fact that all four per-event rotations (T2'

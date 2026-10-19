@@ -1,0 +1,231 @@
+{
+  "env": {
+    "date_utc": "2026-10-19 15:46:55",
+    "git_repo": "/home/jovyan/nfs-data/mri",
+    "git_head": "a0d75e37b591469fbd3eb3ac2f03c906e562a77f",
+    "fast_iso_blame": "a0d75e3",
+    "torch": "2.14.0+cu126",
+    "cuda": "12.6",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "mr0": "1.1.2",
+    "seed": 20261019
+  },
+  "equivalence": [
+    {
+      "shape": [
+        2560
+      ],
+      "max_abs_error": 3.890243169735186e-05,
+      "rel_l2_error": 1.7835716903391585e-07,
+      "correlation": 1.0,
+      "allclose_rtol1e-2_atol1e-3": true,
+      "max_abs_of_ref": 206.21401977539062,
+      "case": {
+        "n": 16,
+        "K": 40,
+        "S": 64,
+        "spin_dist": "rand"
+      },
+      "n_reps": 41,
+      "n_events": 1568,
+      "n_adc": 640
+    },
+    {
+      "shape": [
+        2560
+      ],
+      "max_abs_error": 5.117953332955949e-05,
+      "rel_l2_error": 3.4996025988220936e-07,
+      "correlation": 0.9999998807907104,
+      "allclose_rtol1e-2_atol1e-3": true,
+      "max_abs_of_ref": 205.49221801757812,
+      "case": {
+        "n": 16,
+        "K": 40,
+        "S": 16,
+        "spin_dist": "rand"
+      },
+      "n_reps": 41,
+      "n_events": 1568,
+      "n_adc": 640
+    },
+    {
+      "shape": [
+        2560
+      ],
+      "max_abs_error": 0.0006133957067504525,
+      "rel_l2_error": 2.3597092990712554e-07,
+      "correlation": 1.0000001192092896,
+      "allclose_rtol1e-2_atol1e-3": true,
+      "max_abs_of_ref": 1709.1875,
+      "case": {
+        "n": 32,
+        "K": 20,
+        "S": 64,
+        "spin_dist": "rand"
+      },
+      "n_reps": 21,
+      "n_events": 1098,
+      "n_adc": 640
+    }
+  ],
+  "original_r2_bug": {
+    "note": "MRzeroCore spin_dist='r2' builds spin_pos with torch.stack of three (S,) vectors -> shape (3, S) instead of (S, 3); the subsequent voxel_size broadcast then fails for all S != 3. The fast implementation uses stack(dim=1) and therefore implements the documented (S, 3) behaviour, so r2 runs there but crashes in the reference.",
+    "original": {
+      "status": "crash",
+      "error": "RuntimeError: The size of tensor a (64) must match the size of tensor b (3) at non-singleton dimension 1"
+    },
+    "fast": {
+      "status": "ran",
+      "shape": [
+        8,
+        4
+      ]
+    }
+  },
+  "naive_reference": {
+    "shape": [
+      96
+    ],
+    "max_abs_error": 3.327885451653856e-06,
+    "rel_l2_error": 1.386314011142531e-06,
+    "correlation": 0.9999998807907104,
+    "allclose_rtol1e-2_atol1e-3": true,
+    "max_abs_of_ref": 2.357457160949707,
+    "case": {
+      "n": 4,
+      "S": 4,
+      "K": 6,
+      "spin_dist": "rand"
+    }
+  },
+  "ir_null": {
+    "T1": 1.0,
+    "curve": [
+      {
+        "TI": 0.25,
+        "mag": 569.9503784179688,
+        "ti_over_t1": 0.25
+      },
+      {
+        "TI": 0.4,
+        "mag": 346.457763671875,
+        "ti_over_t1": 0.4
+      },
+      {
+        "TI": 0.55,
+        "mag": 154.09597778320312,
+        "ti_over_t1": 0.55
+      },
+      {
+        "TI": 0.693,
+        "mag": 4.783747673034668,
+        "ti_over_t1": 0.693
+      },
+      {
+        "TI": 0.8,
+        "mag": 108.82920837402344,
+        "ti_over_t1": 0.8
+      },
+      {
+        "TI": 1.1,
+        "mag": 348.75634765625,
+        "ti_over_t1": 1.1
+      }
+    ],
+    "argmin_TI": 0.693,
+    "expected_TI": 0.6931471805599453,
+    "null_depth_vs_flanks": {
+      "null_mag": 4.783747673034668,
+      "flank_min": 108.82920837402344
+    }
+  },
+  "performance": [
+    {
+      "case": {
+        "n": 8,
+        "K": 60,
+        "S": 64
+      },
+      "n_reps": 61,
+      "n_events": 1824,
+      "n_adc": 480,
+      "ref_time_s": 3.8938176940428093,
+      "fast_time_s": 0.14870052051264793,
+      "speedup": 26.185635938722992,
+      "ref_peak_mem_gib": 0.002396106719970703,
+      "fast_peak_mem_gib": 0.012510299682617188,
+      "ref_ms_per_event": 2.1347684726111895,
+      "fast_ms_per_event": 0.08152440817579382
+    },
+    {
+      "case": {
+        "n": 16,
+        "K": 60,
+        "S": 64
+      },
+      "n_reps": 61,
+      "n_events": 2358,
+      "n_adc": 960,
+      "ref_time_s": 5.183753931894898,
+      "fast_time_s": 0.1975163359893486,
+      "speedup": 26.24468455193722,
+      "ref_peak_mem_gib": 0.018766403198242188,
+      "fast_peak_mem_gib": 0.12426900863647461,
+      "ref_ms_per_event": 2.198368927860432,
+      "fast_ms_per_event": 0.08376434944416819
+    },
+    {
+      "case": {
+        "n": 32,
+        "K": 60,
+        "S": 64
+      },
+      "n_reps": 61,
+      "n_events": 3296,
+      "n_adc": 1920,
+      "ref_time_s": 23.630061072064564,
+      "fast_time_s": 1.1383622014545836,
+      "speedup": 20.757945969982487,
+      "ref_peak_mem_gib": 0.14953279495239258,
+      "fast_peak_mem_gib": 1.43145751953125,
+      "ref_ms_per_event": 7.1693146456506565,
+      "fast_ms_per_event": 0.345376881509279
+    },
+    {
+      "case": {
+        "n": 64,
+        "K": 100,
+        "S": 64
+      },
+      "n_reps": 101,
+      "n_events": 8772,
+      "n_adc": 6400,
+      "ref_time_s": 490.1494250620017,
+      "fast_time_s": 24.352838051039726,
+      "speedup": 20.12699398873862,
+      "ref_peak_mem_gib": 1.1956028938293457,
+      "fast_peak_mem_gib": 13.514764785766602,
+      "ref_ms_per_event": 55.87658744436864,
+      "fast_ms_per_event": 2.776201328207903
+    }
+  ],
+  "production_scale": {
+    "case": {
+      "n": 128,
+      "K": 200,
+      "S": 64
+    },
+    "n_reps": 201,
+    "n_events": 30344,
+    "n_adc": 25600,
+    "fast_time_s": 674.6144157799426,
+    "fast_peak_mem_gib": 15.611860752105713,
+    "fast_ms_per_event": 22.232217762323447
+  },
+  "extrapolation_128_6400": {
+    "note": "extrapolated: per-event cost scaled linearly in voxel count; reference at 128^3 scaled 8x from measured 64^3 value",
+    "ref_time_h": 101.72022318761509,
+    "fast_time_min": 303.54387984825615
+  }
+}
