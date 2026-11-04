@@ -129,4 +129,4 @@ def build_sim_data(raw_path, p, device, permute_order=(2, 1, 0)):
     finally:
         torch.set_default_device(prev_default)
 
-    return data, masks, brain_mask, coil_den
+    return data, masks, brain_mask, coil_den, coil_c64
