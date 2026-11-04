@@ -26,9 +26,11 @@ class BSSFPParams:
     slice_thickness: float = 64e-3
     TI_START: float = 20e-3        # TI of the first echo
     TI_inter: float = 4.88e-3      # recovery delay between echoes
+    TR_echo: float = 7.8e-3
     TD: float = 2000e-3            # recovery delay at end of each segment
     TE: float = 3.98e-3 
     # ---- RF ---------------------------------------------------------------
+    TE: float = 3.98e-3            # echo time
     alpha_deg: float = 60.0        # bSSFP flip angle
     rf_spoiling_inc: float = 180.0  # steady-state RF phase cycle per echo
     # ---- simulation -------------------------------------------------------
