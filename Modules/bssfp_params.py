@@ -27,6 +27,7 @@ class BSSFPParams:
     TI_START: float = 20e-3        # TI of the first echo
     TI_inter: float = 4.88e-3      # recovery delay between echoes
     TR_echo: float = 7.8e-3
+    P_echo: float = 12.6e-3
     TD: float = 2000e-3            # recovery delay at end of each segment
     TE: float = 3.98e-3 
     # ---- RF ---------------------------------------------------------------
