@@ -272,3 +272,25 @@ def recon_cg(f, maxiter=20, x0=None):
     x = torch.zeros(n**3, dtype=torch.complex64).view(torch.float32) if x0 is None else x0
     x = conjugate_gradient(Q, b, x, maxiter=maxiter, disable_progressbar=True)
     return x.view(torch.complex64).reshape(n, n, n)
+
+device = torch.device("cuda")
+prev_default = torch.get_default_device()
+torch.set_default_device(device)
+
+def signed_series(mask):
+    m = torch.as_tensor(mask, device=device)
+    w = (m / m.sum()).to(torch.float32)
+    s = []
+    for f in fit_frames:
+        img = torch.real(frames_fit[f] * torch.exp(-1j * ref_phase))
+        s.append(float((img.masked_select(m) * w.masked_select(m)).sum()))
+    return np.array(s)
+
+def mag_series(mask):
+    m = torch.as_tensor(mask, device=device)
+    w = (m / m.sum()).to(torch.float32)
+    s = []
+    for f in fit_frames:
+        img = frames_fit[f].abs()
+        s.append(float((img.masked_select(m) * w.masked_select(m)).sum()))
+    return np.array(s)
