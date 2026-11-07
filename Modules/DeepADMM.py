@@ -1,5 +1,10 @@
+import torch 
+import math
+import torch.nn as nn
+import torchkbnufft as tkbn
 from Modules.Regularizer import Regularizer
-from Modules.Linops import IdentityOperator
+from Modules.recon_ops import IdentityOperator
+from Modules.NumSolvers import conjugate_gradient 
 
 class DeepADMM(nn.Module):
     def __init__(self, shape, rho_init=1e-4, maxiter_admm=1, maxiter_cg=20,
@@ -33,3 +38,22 @@ class DeepADMM(nn.Module):
         for _ in range(n_admm):
             x, z, u = self._step(x, z, u, Q, b, n_cg)
         return x
+
+def _admm_iter(xs, zs, ops, batch, h, bidx, b_f):
+    'one dual-free ADMM iteration (checkpointable); returns NEW lists'
+    xs_new = [None] * len(batch)
+    for i in range(len(batch)):
+        xs_new[i] = conjugate_gradient(ops[i][0] + RHO * I_op, b_f[i] + RHO * zs[i],
+                                       xs[i], CG_ITERS, True)
+    zin = torch.zeros(F_ALL, n, n, n, dtype=torch.complex64, device=device)
+    for f in range(F_ALL):
+        if f == h: continue                          # TEMPORAL MASK: held-out slot zero
+        i = bidx.get(f)
+        v = xs_new[i] if i is not None else x_st[f]  # batch frames / frozen context
+        zin[f] = torch.view_as_complex(v.reshape(-1, 2)).reshape(n, n, n)
+    y = model(torch.view_as_real(zin.permute(1, 2, 3, 0).reshape(-1)).reshape(-1))
+    zall = torch.view_as_complex(y.reshape(-1, 2)).reshape(n, n, n, F_ALL).permute(3, 0, 1, 2)
+    zs_new = [None] * len(batch)
+    for i in range(len(batch)):
+        zs_new[i] = torch.view_as_real(zall[batch[i]].reshape(-1)).reshape(-1)
+    return xs_new, zs_new
