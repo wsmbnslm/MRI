@@ -4,8 +4,8 @@ from typing import Tuple
 import torch
 from torch import nn
 
-from .Resnet import ResNet
-from .Unet import UNet
+from .ResNet import ResNet
+from .UNet import UNet
 
 
 class Regularizer(nn.Module):
