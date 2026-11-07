@@ -3,6 +3,11 @@ import math
 from typing import Optional, Tuple
 from scipy.sparse.linalg import LinearOperator
 from .FourierTransform import nonuniform_fourier_transform_adjoint, nonuniform_fourier_transform_forward 
+import numpy as np
+import Modules.bssfp_params as p
+from Modules import PARAMS, build_sim_data
+
+p=PARAMS
 
 class LinearOperator:
     def __matmul__(self, other):
@@ -294,3 +299,45 @@ def mag_series(mask):
         img = frames_fit[f].abs()
         s.append(float((img.masked_select(m) * w.masked_select(m)).sum()))
     return np.array(s)
+
+class K3(LinearOperator):
+    'coil-batched image (nC,n,n,n) <-> k-space at k (3, nK); shared plans'
+    def __init__(self, k):
+        k = k.to(device=device, dtype=torch.float32)
+        self.k = (-k).unsqueeze(-1)      # sign convention (matches NUFFT3DOperator)
+        nK = k.shape[1]
+        self.forward_shape = (p.N_channels, p.n, p.n, p.n, 1)
+        self.adjoint_shape = (p.N_channels, nK)
+        self.shape = (2 * p.N_channels * nK, 2 * p.N_channels * p.n**3)
+        self.dtype = torch.float32
+        self.device = device
+    def _matvec(self, x):
+        x = torch.view_as_complex(x.reshape(-1, 2)).reshape(self.forward_shape)
+        y = nonuniform_fourier_transform_forward(self.k, x, nufft_ob=nufft3)
+        return torch.view_as_real(y.reshape(-1)).reshape(-1)
+    def _rmatvec(self, x):
+        x = torch.view_as_complex(x.reshape(-1, 2)).reshape(self.adjoint_shape)
+        y = nonuniform_fourier_transform_adjoint(self.k, x, (p.n, p.n, p.n), adj_ob=adj3)
+        return torch.view_as_real(y.reshape(-1)).reshape(-1)
+
+def get_partition(f, k):
+    'deterministic (train, validate, loss) k-position split of frame f, partition k'
+    rng = np.random.default_rng(SEED * 1_000_003 + f * 101 + k)
+    perm = rng.permutation(nKf[f])
+    nv = int(round(0.20 * nKf[f])); ntr = int(round(0.40 * (nKf[f] - nv)))
+    return (torch.as_tensor(perm[:ntr], device=device),
+            torch.as_tensor(perm[ntr:ntr + nv], device=device),
+            torch.as_tensor(perm[ntr + nv:], device=device))
+
+def _sub(d, idx, Kf):
+    # d: flat real (2 * N_channels * Kf), coil-major; idx applied to every coil
+    return d.view(p.N_channels, Kf, 2)[:, idx].reshape(-1).contiguous()
+
+def A_ops(f, k):                    # per-frame k positions (trajectory advances per frame)
+    tr, va, lo = get_partition(f, k)
+    kk = kwic_k[f].to(device)
+    At = K3(kk[:, tr]) @ C_op
+    Al = K3(kk[:, lo]) @ C_op
+    Av = K3(kk[:, va]) @ C_op
+    inv = 1.0 / (p.N_channels * nKf[f])
+    return (At.H @ At) * inv, At, Al, Av
