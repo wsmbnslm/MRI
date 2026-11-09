@@ -1,3 +1,8 @@
+"""
+Written by Wassim Bensalem
+"""
+
+
 """Vectorized drop-in replacement for ``MRzeroCore.isochromat_sim``.
 
 Why the original is slow
