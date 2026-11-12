@@ -4,7 +4,7 @@
 **Code under test:** `examples/Modules/fast_iso.py` (commit `a0d75e3`)
 **Reference:** `MRzeroCore.isochromat_sim`, MRzeroCore 1.1.2
 **Hardware:** NVIDIA A100-SXM4-40GB, PyTorch 2.14.0+cu126
-**Reproduce:** `python benchmarks/bench_fast_iso.py` — regenerates every number and figure in this report. Raw results: [`fast_iso_benchmark.json`](fast_iso_benchmark.json).
+**Reproduce:** `python benchmarks/bench_fast_iso.py` regenerates every number and figure in this report. Raw results: [`fast_iso_benchmark.json`](fast_iso_benchmark.json).
 
 ## TL;DR
 
@@ -40,7 +40,7 @@ The reference loops over every event and, per event:
 1. clones the full `(voxels, spins, 3)` magnetization tensor,
 2. applies T1/T2 relaxation into a fresh `empty_like` tensor,
 3. builds a full 3×3 rotation matrix of shape `(voxels·spins, 3, 3)` for T2′
-   dephasing — zero-initialised, then filled with five indexed writes — and
+   dephasing zero-initialised, then filled with five indexed writes and
    applies it with `einsum`. The same pattern repeats for intra-voxel
    precession, B₀ precession and gradient precession (three more
    matrix builds + `einsum` per event).
@@ -51,8 +51,8 @@ petabytes total), which is why a full production simulation took hours.
 
 ## 2. Method
 
-All four per-event rotations — T2′ dephasing, intra-voxel precession, B₀
-precession and gradient precession — are rotations about the **same z
+All four per-event rotations, T2′ dephasing, intra-voxel precession, B₀
+precession and gradient precession are rotations about the **same z
 axis**. Rotations about one axis compose by addition of angles, so the
 four per-event rotations reduce to a single angle per (voxel, spin, event).
 
@@ -116,7 +116,7 @@ scale (4³ voxels, 4 spins, 6 readouts):
 
 Together with §3.1 this closes the circle: fast ≈ reference (measured),
 fast ≈ independent implementation (measured), and the reference is the
-released library both were derived from — so agreement cannot be explained
+released library both were derived from so agreement cannot be explained
 by a shared bug.
 
 ### 3.3 Physics check: inversion-recovery null
@@ -125,7 +125,7 @@ A uniform single-tissue phantom (T1 = 1 s, T2 = 0.1 s, PD = 1, one
 constant coil) is inverted with a 180° pulse, followed by bSSFP readouts
 at six inversion times. The Bloch equations require M_z to cross zero at
 **TI = T1·ln 2 ≈ 0.693 s**, which must appear as a null in the measured
-signal — a prediction that neither implementation was tuned to reproduce.
+signal a prediction that neither implementation was tuned to reproduce.
 
 | TI/T1 | 0.25 | 0.40 | 0.55 | 0.693 | 0.80 | 1.10 |
 |---|---|---|---|---|---|---|
@@ -134,7 +134,7 @@ signal — a prediction that neither implementation was tuned to reproduce.
 ![IR null curve](ir_null_curve.png)
 
 The signal minimum is found at TI = 0.693 s — exactly T1·ln 2 to the
-resolution of the sweep — and is only **4.4%** of the nearest flank
+resolution of the sweep and is only **4.4%** of the nearest flank
 value (109 at TI/T1 = 0.80). The recovery curve is symmetric about the
 null and monotonically approaches the un-inverted level, exactly as the
 Bloch equations predict.
@@ -195,7 +195,7 @@ Reading the scaling: at 8³–16³ both implementations are in the
 launch-overhead regime (per-event cost flat at ~2.1 ms for the reference
 and ~0.08 ms for the fast version, regardless of n). From 32³ on the
 reference's per-event cost is dominated by the large temporaries it
-materializes four times per event — clone, relaxation, and a `(V·S, 3, 3)`
+materializes four times per event clone, relaxation, and a `(V·S, 3, 3)`
 rotation matrix (zero-init + five indexed writes + `einsum`) for each of
 T2′, intra-voxel, B₀ and gradient precession — so it climbs 2.1 → 7.2 →
 55.9 ms from 8³ to 64³ (sublinear in V·S, approaching linear). The fast version's per-event cost also grows
@@ -206,7 +206,7 @@ range, with the absolute time saving growing with problem size.
 
 ### 4.3 Production scale
 
-**Thesis production configuration** (64³ voxels, 64 spins, 6400 readouts —
+**Thesis production configuration** (64³ voxels, 64 spins, 6400 readouts
 the actual scale of the BSSFP/MPnRAGE simulations in this repository),
 extrapolated from the measured 64³ per-readout cost above (4.9 s vs.
 0.24 s per readout):
@@ -223,7 +223,7 @@ scale is ~4 days, see below): 128³ voxels, 64 spins, 200 readouts:
 measured per-event costs linearly in voxel count (reference: 8× the
 measured 64³ per-event value; fast: the measured 128³ per-event value):
 reference ≈ **102 h (≈4.2 days)**, fast ≈ **304 min (≈5.1 h)**.
-Labelled *extrapolated* — it follows directly from the measured
+Labelled *extrapolated* it follows directly from the measured
 64³/128³ per-event costs, both of which scale linearly in V·S, but it is
 not a direct measurement.
 
