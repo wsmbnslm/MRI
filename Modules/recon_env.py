@@ -94,7 +94,7 @@ def setup_recon(repo_root, device, ns,
     model = None
     if build_model:
         model = Regularizer((n, n, n, F_ALL), regularizer="ResNet", features=32,
-                            num_of_resblocks=6, kernel_size=(3, 3, 3), scale_factor=1,
+                            num_of_resblocks=6, kernel_size=(3, 3, 3), scale_factor=0.1,
                             device=device, dtype=torch.complex64)
 
     # --- warm start: regrid at data scale ------------------------------------
